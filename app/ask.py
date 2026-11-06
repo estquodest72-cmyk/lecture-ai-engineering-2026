@@ -11,6 +11,7 @@
 """
 
 import argparse
+import time
 
 from google import genai
 from google.genai import errors
@@ -21,14 +22,18 @@ from app.config import MODEL, api_error_message, get_api_key
 DEFAULT_QUESTION = "AIE2026の講座の宿題にある「3レベル」とは何ですか？"
 
 
-def ask(question: str) -> str:
-    client = genai.Client(api_key=get_api_key())
-    response = client.models.generate_content(model=MODEL, contents=question)
+#def ask(question: str) -> str:
+def ask(chat, question: str) -> str:
+#    client = genai.Client(api_key=get_api_key())
+#    response = client.models.generate_content(model=MODEL, contents=question)
+    response = chat.send_message(question)
 
     # TODO(第1回 演習): response.usage_metadata から
     #   入力トークン数と出力トークン数を表示してみよう（Copilotに頼んでよい）
 
-    return response.text
+    usage = response.usage_metadata
+
+    return response.text, usage.prompt_token_count, usage.candidates_token_count
 
 
 def main() -> None:
@@ -36,13 +41,30 @@ def main() -> None:
     parser.add_argument("question", nargs="?", default=DEFAULT_QUESTION)
     args = parser.parse_args()
 
+    client = genai.Client(api_key=get_api_key())
+    chat = client.chats.create(model=MODEL)
+
     print(f"[model] {MODEL}")
-    print(f"[質問] {args.question}\n")
-    try:
-        print(ask(args.question))
-    except errors.APIError as e:
-        print(api_error_message(e.code, e.message))
-        raise SystemExit(1)
+
+    question = args.question
+
+    while question:
+        print(f"[質問] {question}\n")
+#        print(f"[質問] {args.question}\n")
+        try:
+            start = time.perf_counter()
+            response_text, usage_prompt_token_count, usage_candidates_token_count= ask(chat, question)
+            elapsed = time.perf_counter() - start
+#            response_text, usage_prompt_token_count, usage_candidates_token_count= ask(args.question)
+            print(f'[回答] {response_text}\n')
+            print(f'[入力トークン数] {usage_prompt_token_count}')
+            print(f'[出力トークン数] {usage_candidates_token_count}')
+            print(f'[応答時間] {elapsed:.3f}秒')
+        except errors.APIError as e:
+            print(api_error_message(e.code, e.message))
+            raise SystemExit(1)
+
+        question = input("\n[次の質問（空欄で終了）] ").strip()
 
 
 if __name__ == "__main__":
