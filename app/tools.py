@@ -4,9 +4,12 @@
 説明文を書き換えると、モデルがツールを使うかどうか・どんな引数で呼ぶかが変わる。
 """
 
+import datetime
 import json
+import random
 from functools import cache
 from pathlib import Path
+from pydantic_ai import RunContext, ApprovalRequired
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 MAX_RESULTS = 3
@@ -77,3 +80,59 @@ def get_lecture_summary(lecture: int) -> str:
         available = sorted(p.stem for p in (DATA_DIR / "lectures").glob("*.md"))
         return f"第{lecture}回の要点はまだありません。用意されている回: {', '.join(available)}"
     return path.read_text(encoding="utf-8")
+
+def make_quiz(lecture: int) -> str:
+    """指定した回の用語から 1つを選び、
+    確認問題と答えを返す。
+    「第2回の確認問題を出して」のように、
+    復習用の問題を求められたときに使う。
+    """
+    # 1. load_glossary() から lecture が一致する用語を集める
+    glossary = load_glossary()
+    glossary = [g for g in load_glossary() if g["lecture"] == lecture]
+    if not glossary:
+        return "クイズを作成できません。用語集に項目がありません。"
+    # 2. 1 つ選ぶ（random.choice ）
+    choice = random.choice(glossary)
+    # 3. 問題と答えを文字列で返す（ json.dumps など）
+    return json.dumps(
+        {
+            "term": choice["term"],
+            "definition": choice["definition"]
+        },
+        ensure_ascii=False,
+    )
+
+def save_learning_log(ctx: RunContext, lecture: int, content: str) -> str:
+    """指定した回の学習の記録を、
+    learning_log/フォルダに保存する。
+    「第2回では基盤モデルの仕組みを学んだ。基盤モデルとは多くのタスクに適用させた1つのモデルのこと。これまでは、タスク毎に専用のモデルを一つずつ作っていた。」のように、
+    学習した内容を報告されたときに使う。
+    contentはmarkdownで書く。
+    """
+    filename = f"learning_log/lec{lecture:02d}.txt"
+    path = Path(filename)
+
+    if not path.exists():
+        if path.parent.is_dir():
+            question = f"{path.parent}に{path.name}を作りますか？"
+        else:
+            question = f"{filename}を作りますか？"
+
+        if not ctx.tool_call_approved:
+            raise ApprovalRequired(metadata={"question": question})
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(exist_ok=False)
+
+    with open(filename, "a", encoding="utf-8") as f:
+        f.write(f"# {format(datetime.date.today(), '%Y%m%d')}\n{content}\n")
+
+    return f"{filename} に学習記録を保存しました"
+#    return json.dumps(
+#        {
+#            "filename": filename,
+#            "content": content
+#        },
+#        ensure_ascii=False,
+#    )
