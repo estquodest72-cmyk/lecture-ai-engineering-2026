@@ -296,6 +296,23 @@ FT でも知識が入りやすくなる
 [usage] 入力 9,214 tokens / 出力 335 tokens / モデル応答 5 回
 [cost] 生成APIの推定コスト: $0.003602 USD（埋め込み・索引構築分は含まない）
 
+[model] gemini-3.5-flash-lite
+第2回の講義資料によると、LoRAとQLoRAの仕組みについて以下のように説明されています。
+
+* **LoRA（Low-Rank Adaptation）**
+  * **何を固定するか：** 元のモデルの重み（本体）を固定し、学習は行いません（第2回・PDF p.52）。
+  * **何を学習するか：** 細長い2つの小さな行列（低ランクの差分を表す追加の行列 $A$ と $B$）のパラメータだけを学習します（第2回・PDF p.51, p.52）。
+
+* **QLoRA（Quantized LoRA）**
+  * **何を加えるか：** LoRAの手法に加えて、**元のモデルの重みを4bitに量子化（圧縮）**するという処理を加えます（第2回・PDF p.51, p.52）。これにより、メモリ消費量をさらに大幅に抑えて大きなモデルを動かせるようにしています。
+
+--- trace ---
+[tool call]   search_graph({'query': 'LoRA 固定 QLoRA 追加'})
+[tool return] search_graph -> {"seeds": [{"page_id": "lec02-main-p052", "document_id": "lec02-main", "lecture": 2, "document_title": "基盤モデルの仕組み", "sec…
+[time] 回答完了まで 3.24 秒（検索・埋め込みを含む）
+[usage] 入力 5,773 tokens / 出力 233 tokens / モデル応答 2 回
+[cost] 生成APIの推定コスト: $0.002314 USD（埋め込み・索引構築分は含まない）
+
 ### STEP 3-bis：検索結果を使って回答させる
 
 [model] gemini-3.5-flash-lite
