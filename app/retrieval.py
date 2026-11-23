@@ -137,6 +137,37 @@ def search(query: str) -> list[dict]:
         """, (sqlite_vec.serialize_float32(vector), RAG_TOP_K))
         return [dict(row) for row in rows]
 
+def extend_search(original: list[dict]) -> list[dict]:
+    """search()の結果を前後1ページに拡張し、重複を除去する。"""
+    if not isinstance(original, list) or not original:
+        raise ValueError("元検索結果が空です。")
+
+    original_ids = {(o["document_id"], o["page_id"]) for o in original}
+    seen = set()
+    result = []
+
+    with open_index(RAG_DB) as db:
+        for o in original:
+            rows = db.execute("""
+                SELECT page_id, document_id, lecture, document_title, section, title, page, content,
+                       NULL AS distance
+                FROM chunks
+                WHERE document_id = ? AND page IN (?, ?)
+                ORDER BY page, page_id
+            """, (o["document_id"], o["page"] - 1, o["page"] + 1))
+
+            neighbors = [dict(row) for row in rows]
+            before = [r for r in neighbors if r["page"] < o["page"]]
+            after = [r for r in neighbors if r["page"] > o["page"]]
+
+            for r in before + [o] + after:
+                key = (r["document_id"], r["page_id"])
+                if key in seen or (r is not o and key in original_ids):
+                    continue
+                seen.add(key)
+                result.append(r)
+
+    return result
 
 def search_graph(query: str) -> dict:
     """ベクトル検索を入口に、前後ページと共通用語で候補を広げる。"""

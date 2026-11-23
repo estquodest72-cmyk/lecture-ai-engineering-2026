@@ -88,10 +88,13 @@ def search_materials(query: str) -> str:
     """
     from google.genai.errors import APIError
     import sqlite3
-    from app.retrieval import search
+    from app.retrieval import search, extend_search
 
     try:
-        return json.dumps({"results": search(query)}, ensure_ascii=False)
+        result = search(query)
+        result = extend_search(result)
+#        return json.dumps({"results": search(query)}, ensure_ascii=False)
+        return json.dumps({"results": result}, ensure_ascii=False)
     except (ValueError, FileNotFoundError, sqlite3.Error) as e:
         return json.dumps({"error": str(e), "results": []}, ensure_ascii=False)
     except APIError as e:
